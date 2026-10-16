@@ -29,4 +29,4 @@ Implementación del algoritmo de Dijkstra en Python con Programación Orientada 
 
 ## Autor
 
-Elis Israel Sierra Rangel
+Elias Israel Sierra Rangel

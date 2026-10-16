@@ -1,7 +1,7 @@
 """
 Título: Algoritmo de Dijkstra
 Nombre completo: Elias Israel Sierra Rangel
-Fecha de creación: 13 de octubre de 2026
+Fecha de creación: 16 de octubre de 2026
 Descripción: Implementación del algoritmo de Dijkstra en Python con POO
 """
 
