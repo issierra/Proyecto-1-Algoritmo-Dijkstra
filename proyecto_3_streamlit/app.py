@@ -175,8 +175,16 @@ def main() -> None:
         st.warning(f"Se omitieron {st.session_state['omitidas']} filas "
                    "de nodos.csv por tener datos inválidos.")
 
-    tab_ruta, tab_registro, tab_red = st.tabs(
-        ["Ruta más corta", "Registrar conexión", "Red actual"])
+    with st.sidebar:
+        st.header("Agregar tramo")
+        origen_nuevo = st.text_input("Nodo origen", key="origen_nuevo")
+        destino_nuevo = st.text_input("Nodo destino", key="destino_nuevo")
+        peso_nuevo = st.text_input("Peso (número mayor que 0)",
+                                   key="peso_nuevo")
+        if st.button("Guardar conexión", key="boton_registro"):
+            registra_conexion(origen_nuevo, destino_nuevo, peso_nuevo)
+
+    tab_ruta, tab_red = st.tabs(["Ruta más corta", "Red actual"])
 
     with tab_ruta:
         if grafo.nodos:
@@ -190,14 +198,6 @@ def main() -> None:
                                              key="destino_ruta")
         if st.button("Calcular ruta", key="boton_ruta"):
             calcula_ruta(grafo, inicio, destino)
-
-    with tab_registro:
-        origen_nuevo = st.text_input("Nodo origen", key="origen_nuevo")
-        destino_nuevo = st.text_input("Nodo destino", key="destino_nuevo")
-        peso_nuevo = st.text_input("Peso (número mayor que 0)",
-                                   key="peso_nuevo")
-        if st.button("Guardar conexión", key="boton_registro"):
-            registra_conexion(origen_nuevo, destino_nuevo, peso_nuevo)
 
     # Esta pestaña se dibuja al final para reflejar conexiones recién
     # guardadas en la misma ejecución
