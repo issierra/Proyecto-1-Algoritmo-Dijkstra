@@ -12,9 +12,6 @@ from io_handler import formatea_peso
 ANCHO_MAPA = 660
 ALTO_MAPA = 520
 MARGEN_MAPA = 80
-COLOR_RUTA = "#2A62D9"
-COLOR_INICIO = "#1E8E5A"
-COLOR_DESTINO = "#D92B2B"
 
 
 def calcula_posiciones(
@@ -47,17 +44,42 @@ def calcula_posiciones(
     return posiciones
 
 
-def crea_svg_mapa(grafo: Grafo, camino: list[str] | None = None) -> str:
+PALETAS = {
+    "Mapa": {
+        "fondo": "#EEF2F5", "linea": "#9AA5B1", "etiqueta": "#FFFFFF",
+        "borde_etiqueta": "#C5CDD5", "texto": "#1F2933",
+        "nodo": "#FFFFFF", "borde_nodo": "#5B6770", "ruta": "#2A62D9",
+        "inicio": "#1E8E5A", "destino": "#D92B2B", "brillo": False},
+    "Satélite": {
+        "fondo": "#0F1C1A", "linea": "#37524D", "etiqueta": "#16302C",
+        "borde_etiqueta": "#37524D", "texto": "#E6F4F1",
+        "nodo": "#16302C", "borde_nodo": "#6E9A91", "ruta": "#3DF2D0",
+        "inicio": "#4ADE80", "destino": "#FF6B6B", "brillo": True},
+}
+
+
+def crea_linea(x1: float, y1: float, x2: float, y2: float,
+               color: str, grosor: int, extra: str = "") -> str:
+    """Devuelve el texto SVG de una línea redondeada entre dos puntos."""
+    return (f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" '
+            f'y2="{y2:.1f}" stroke="{color}" stroke-width="{grosor}" '
+            f'stroke-linecap="round" {extra}/>')
+
+
+def crea_svg_mapa(grafo: Grafo, camino: list[str] | None = None,
+                  modo: str = "Mapa") -> str:
     """Genera el SVG del mapa con nodos, conexiones y pesos.
 
     Args:
         grafo: Grafo cargado en memoria.
         camino: Nodos de la ruta a resaltar, en orden. Si es None o está
             vacío, solo se dibuja la red.
+        modo: Nombre de la paleta de colores: "Mapa" o "Satélite".
 
     Returns:
         Texto con el SVG completo, listo para mostrarse en una página.
     """
+    paleta = PALETAS[modo]
     camino = camino or []
     # frozenset hace que el tramo A-B sea igual al B-A
     tramos_ruta = {frozenset(par) for par in zip(camino, camino[1:])}
@@ -65,8 +87,11 @@ def crea_svg_mapa(grafo: Grafo, camino: list[str] | None = None) -> str:
     partes = [f'<svg xmlns="http://www.w3.org/2000/svg" '
               f'viewBox="0 0 {ANCHO_MAPA} {ALTO_MAPA}" '
               f'width="100%" height="100%" font-family="sans-serif">',
+              '<defs><filter id="brillo" x="-20%" y="-20%" width="140%" '
+              'height="140%"><feGaussianBlur stdDeviation="6"/>'
+              '</filter></defs>',
               f'<rect width="{ANCHO_MAPA}" height="{ALTO_MAPA}" '
-              f'rx="12" fill="#EEF2F5"/>']
+              f'rx="12" fill="{paleta["fondo"]}"/>']
 
     lineas_red = []
     lineas_ruta = []
@@ -78,40 +103,48 @@ def crea_svg_mapa(grafo: Grafo, camino: list[str] | None = None) -> str:
                 x1, y1 = posiciones[origen]
                 x2, y2 = posiciones[destino]
                 en_ruta = frozenset((origen, destino)) in tramos_ruta
-                color = COLOR_RUTA if en_ruta else "#9AA5B1"
-                grosor = 8 if en_ruta else 5
-                linea = (f'<line x1="{x1:.1f}" y1="{y1:.1f}" '
-                         f'x2="{x2:.1f}" y2="{y2:.1f}" stroke="{color}" '
-                         f'stroke-width="{grosor}" stroke-linecap="round"/>')
-                # Las líneas de la ruta se dibujan después para quedar encima
-                (lineas_ruta if en_ruta else lineas_red).append(linea)
+                if en_ruta:
+                    # En modo satélite, un trazo borroso simula el brillo
+                    if paleta["brillo"]:
+                        lineas_ruta.append(crea_linea(
+                            x1, y1, x2, y2, paleta["ruta"], 16,
+                            'opacity="0.6" filter="url(#brillo)"'))
+                    lineas_ruta.append(
+                        crea_linea(x1, y1, x2, y2, paleta["ruta"], 8))
+                else:
+                    lineas_red.append(
+                        crea_linea(x1, y1, x2, y2, paleta["linea"], 5))
                 etiquetas.append(((x1 + x2) / 2, (y1 + y2) / 2,
                                   formatea_peso(peso), en_ruta))
+    # Las líneas de la ruta se dibujan después para quedar encima
     partes += lineas_red + lineas_ruta
 
     # Los pesos van sobre las líneas, en una etiqueta en el punto medio
     for x, y, texto, en_ruta in etiquetas:
         ancho = 10 * len(texto) + 14
-        borde = COLOR_RUTA if en_ruta else "#C5CDD5"
-        color_texto = COLOR_RUTA if en_ruta else "#1F2933"
+        borde = paleta["ruta"] if en_ruta else paleta["borde_etiqueta"]
+        color_texto = paleta["ruta"] if en_ruta else paleta["texto"]
         partes.append(f'<rect x="{x - ancho / 2:.1f}" y="{y - 11:.1f}" '
                       f'width="{ancho}" height="22" rx="11" '
-                      f'fill="#FFFFFF" stroke="{borde}" stroke-width="2"/>')
+                      f'fill="{paleta["etiqueta"]}" stroke="{borde}" '
+                      f'stroke-width="2"/>')
         partes.append(f'<text x="{x:.1f}" y="{y + 5:.1f}" '
                       f'text-anchor="middle" font-size="13" '
                       f'font-weight="bold" fill="{color_texto}">'
                       f'{escape(texto)}</text>')
 
     for nombre, (x, y) in posiciones.items():
-        relleno, borde, color_texto = "#FFFFFF", "#5B6770", "#1F2933"
+        relleno = paleta["nodo"]
+        borde = paleta["borde_nodo"]
+        color_texto = paleta["texto"]
         if camino and nombre == camino[0]:
-            relleno = borde = COLOR_INICIO
-            color_texto = "#FFFFFF"
+            relleno = borde = paleta["inicio"]
+            color_texto = "#0F1C1A" if paleta["brillo"] else "#FFFFFF"
         elif camino and nombre == camino[-1]:
-            relleno = borde = COLOR_DESTINO
-            color_texto = "#FFFFFF"
+            relleno = borde = paleta["destino"]
+            color_texto = "#0F1C1A" if paleta["brillo"] else "#FFFFFF"
         elif nombre in camino:
-            borde = COLOR_RUTA
+            borde = paleta["ruta"]
         partes.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="22" '
                       f'fill="{relleno}" stroke="{borde}" '
                       f'stroke-width="3"/>')

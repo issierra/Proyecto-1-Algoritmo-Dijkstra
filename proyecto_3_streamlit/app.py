@@ -169,13 +169,16 @@ def muestra_mapa(grafo: Grafo) -> None:
     if not grafo.nodos:
         st.info("El mapa aparecerá cuando haya conexiones registradas.")
         return
+    modo = st.radio("Vista del mapa", ["Mapa", "Satélite"],
+                    horizontal=True, key="modo_mapa",
+                    label_visibility="collapsed")
     # Si hay una ruta guardada, el mapa la resalta
     ruta = st.session_state.get("ultima_ruta")
     camino = ruta["camino"] if ruta else None
     # El div de 100vh hace que el SVG ocupe toda la altura del marco
     components.html(
         f'<body style="margin:0"><div style="height:100vh">'
-        f'{crea_svg_mapa(grafo, camino)}</div></body>',
+        f'{crea_svg_mapa(grafo, camino, modo)}</div></body>',
         height=ALTO_MAPA + 20)
 
 
