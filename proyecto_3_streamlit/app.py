@@ -90,13 +90,18 @@ def crea_tabla_dijkstra(distancias: dict[str, float],
 
 def calcula_ruta(grafo: Grafo, inicio_texto: str,
                  destino_texto: str) -> None:
-    """Valida los nodos, ejecuta Dijkstra y muestra el resultado.
+    """Valida los nodos, ejecuta Dijkstra y guarda el resultado.
+
+    El resultado queda en st.session_state para que siga visible
+    aunque el usuario interactúe con otros elementos de la app.
 
     Args:
         grafo: Grafo cargado en memoria.
         inicio_texto: Texto escrito para el nodo de inicio.
         destino_texto: Texto escrito para el nodo de destino.
     """
+    # Se descarta el resultado anterior antes de calcular uno nuevo
+    st.session_state.pop("ultima_ruta", None)
     inicio = inicio_texto.strip()
     destino = destino_texto.strip()
 
@@ -112,18 +117,45 @@ def calcula_ruta(grafo: Grafo, inicio_texto: str,
         st.error(error.args[0])
         return
 
+    st.session_state["ultima_ruta"] = {
+        "inicio": inicio, "destino": destino, "distancia": distancia,
+        "camino": camino, "distancias": distancias,
+        "anteriores": anteriores}
+
+
+def muestra_ruta(grafo: Grafo) -> None:
+    """Dibuja la última ruta calculada, si existe.
+
+    Args:
+        grafo: Grafo cargado en memoria, usado para leer el peso de
+            cada tramo de la ruta.
+    """
+    ruta = st.session_state.get("ultima_ruta")
+    if ruta is None:
+        return
+
+    camino = ruta["camino"]
     if not camino:
-        st.warning(f"No existe una ruta entre {inicio} y {destino}.")
+        st.warning(f"No existe una ruta entre {ruta['inicio']} "
+                   f"y {ruta['destino']}.")
     else:
         st.success("Ruta más corta: " + " → ".join(camino))
         columna_peso, columna_saltos = st.columns(2)
-        columna_peso.metric("Peso total", formatea_peso(distancia))
+        columna_peso.metric("Peso total", formatea_peso(ruta["distancia"]))
         columna_saltos.metric("Saltos en la ruta", len(camino) - 1)
 
+        st.subheader("Indicaciones")
+        for numero, (origen, siguiente) in enumerate(
+                zip(camino, camino[1:]), start=1):
+            peso = grafo.nodos[origen].vecinos[siguiente]
+            st.write(f"{numero}. De **{origen}** a **{siguiente}** "
+                     f"(peso {formatea_peso(peso)})")
+
     # Detalle técnico del algoritmo, oculto hasta que el usuario lo pida
-    with st.expander(f"Distancias de Dijkstra desde {inicio}"):
-        st.dataframe(crea_tabla_dijkstra(distancias, anteriores),
-                     hide_index=True)
+    with st.expander(f"Distancias de Dijkstra desde {ruta['inicio']}"):
+        st.dataframe(
+            crea_tabla_dijkstra(ruta["distancias"], ruta["anteriores"]),
+            hide_index=True)
 
 
 def registra_conexion(origen_texto: str, destino_texto: str,
@@ -156,6 +188,8 @@ def registra_conexion(origen_texto: str, destino_texto: str,
 
     # Solo se actualiza la memoria si el guardado en disco tuvo éxito
     st.session_state["grafo"].agregar_conexion(origen, destino, peso)
+    # Una conexión nueva puede cambiar la ruta: se descarta la guardada
+    st.session_state.pop("ultima_ruta", None)
     st.success(f"Conexión {origen} - {destino} (peso "
                f"{formatea_peso(peso)}) guardada en nodos.csv.")
 
@@ -198,6 +232,7 @@ def main() -> None:
                                              key="destino_ruta")
         if st.button("Calcular ruta", key="boton_ruta"):
             calcula_ruta(grafo, inicio, destino)
+        muestra_ruta(grafo)
 
     # Esta pestaña se dibuja al final para reflejar conexiones recién
     # guardadas en la misma ejecución
