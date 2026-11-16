@@ -56,7 +56,7 @@ def crea_svg_mapa(grafo: Grafo) -> str:
     posiciones = calcula_posiciones(list(grafo.nodos))
     partes = [f'<svg xmlns="http://www.w3.org/2000/svg" '
               f'viewBox="0 0 {ANCHO_MAPA} {ALTO_MAPA}" '
-              f'width="100%" font-family="sans-serif">',
+              f'width="100%" height="100%" font-family="sans-serif">',
               f'<rect width="{ANCHO_MAPA}" height="{ALTO_MAPA}" '
               f'rx="12" fill="#EEF2F5"/>']
 

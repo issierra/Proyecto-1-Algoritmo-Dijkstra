@@ -5,8 +5,10 @@
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from grafo import Grafo
+from mapa import ALTO_MAPA, crea_svg_mapa
 from io_handler import (RUTA_CSV, cargar_grafo, convierte_peso,
                         formatea_peso, guardar_conexion,
                         valida_nombre_nodo)
@@ -158,6 +160,22 @@ def muestra_ruta(grafo: Grafo) -> None:
             hide_index=True)
 
 
+def muestra_mapa(grafo: Grafo) -> None:
+    """Dibuja el mapa esquemático de la red.
+
+    Args:
+        grafo: Grafo cargado en memoria.
+    """
+    if not grafo.nodos:
+        st.info("El mapa aparecerá cuando haya conexiones registradas.")
+        return
+    # El div de 100vh hace que el SVG ocupe toda la altura del marco
+    components.html(
+        f'<body style="margin:0"><div style="height:100vh">'
+        f'{crea_svg_mapa(grafo)}</div></body>',
+        height=ALTO_MAPA + 20)
+
+
 def registra_conexion(origen_texto: str, destino_texto: str,
                       peso_texto: str) -> None:
     """Valida una conexión nueva, la guarda en el CSV y en memoria.
@@ -221,18 +239,26 @@ def main() -> None:
     tab_ruta, tab_red = st.tabs(["Ruta más corta", "Red actual"])
 
     with tab_ruta:
-        if grafo.nodos:
-            st.caption("Nodos disponibles: " + ", ".join(sorted(grafo.nodos)))
-        else:
-            st.info("La red está vacía. Registra una conexión primero.")
-        columna_inicio, columna_destino = st.columns(2)
-        inicio = columna_inicio.text_input("Nodo de inicio",
-                                           key="inicio_ruta")
-        destino = columna_destino.text_input("Nodo de destino",
-                                             key="destino_ruta")
-        if st.button("Calcular ruta", key="boton_ruta"):
-            calcula_ruta(grafo, inicio, destino)
-        muestra_ruta(grafo)
+        columna_panel, columna_mapa = st.columns([2, 3])
+
+        with columna_panel:
+            if grafo.nodos:
+                nombres = ", ".join(sorted(grafo.nodos))
+                st.caption(f"Nodos disponibles: {nombres}")
+            else:
+                st.info("La red está vacía. Registra una conexión primero.")
+            columna_inicio, columna_destino = st.columns(2)
+            inicio = columna_inicio.text_input("Nodo de inicio",
+                                               key="inicio_ruta")
+            destino = columna_destino.text_input("Nodo de destino",
+                                                 key="destino_ruta")
+            if st.button("Calcular ruta", key="boton_ruta"):
+                calcula_ruta(grafo, inicio, destino)
+            muestra_ruta(grafo)
+
+        # El mapa se dibuja después del panel para poder reflejar su ruta
+        with columna_mapa:
+            muestra_mapa(grafo)
 
     # Esta pestaña se dibuja al final para reflejar conexiones recién
     # guardadas en la misma ejecución
