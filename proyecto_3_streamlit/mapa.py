@@ -12,6 +12,9 @@ from io_handler import formatea_peso
 ANCHO_MAPA = 660
 ALTO_MAPA = 520
 MARGEN_MAPA = 80
+COLOR_RUTA = "#2A62D9"
+COLOR_INICIO = "#1E8E5A"
+COLOR_DESTINO = "#D92B2B"
 
 
 def calcula_posiciones(
@@ -44,15 +47,20 @@ def calcula_posiciones(
     return posiciones
 
 
-def crea_svg_mapa(grafo: Grafo) -> str:
+def crea_svg_mapa(grafo: Grafo, camino: list[str] | None = None) -> str:
     """Genera el SVG del mapa con nodos, conexiones y pesos.
 
     Args:
-        grafo: Grafo cargado en memoria
+        grafo: Grafo cargado en memoria.
+        camino: Nodos de la ruta a resaltar, en orden. Si es None o está
+            vacío, solo se dibuja la red.
 
     Returns:
         Texto con el SVG completo, listo para mostrarse en una página.
     """
+    camino = camino or []
+    # frozenset hace que el tramo A-B sea igual al B-A
+    tramos_ruta = {frozenset(par) for par in zip(camino, camino[1:])}
     posiciones = calcula_posiciones(list(grafo.nodos))
     partes = [f'<svg xmlns="http://www.w3.org/2000/svg" '
               f'viewBox="0 0 {ANCHO_MAPA} {ALTO_MAPA}" '
@@ -60,7 +68,8 @@ def crea_svg_mapa(grafo: Grafo) -> str:
               f'<rect width="{ANCHO_MAPA}" height="{ALTO_MAPA}" '
               f'rx="12" fill="#EEF2F5"/>']
 
-    # Primero las líneas, para que los nodos queden encima
+    lineas_red = []
+    lineas_ruta = []
     etiquetas = []
     for origen in sorted(grafo.nodos):
         for destino, peso in sorted(grafo.nodos[origen].vecinos.items()):
@@ -68,29 +77,47 @@ def crea_svg_mapa(grafo: Grafo) -> str:
             if origen < destino:
                 x1, y1 = posiciones[origen]
                 x2, y2 = posiciones[destino]
-                partes.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" '
-                              f'x2="{x2:.1f}" y2="{y2:.1f}" '
-                              f'stroke="#9AA5B1" stroke-width="5" '
-                              f'stroke-linecap="round"/>')
+                en_ruta = frozenset((origen, destino)) in tramos_ruta
+                color = COLOR_RUTA if en_ruta else "#9AA5B1"
+                grosor = 8 if en_ruta else 5
+                linea = (f'<line x1="{x1:.1f}" y1="{y1:.1f}" '
+                         f'x2="{x2:.1f}" y2="{y2:.1f}" stroke="{color}" '
+                         f'stroke-width="{grosor}" stroke-linecap="round"/>')
+                # Las líneas de la ruta se dibujan después para quedar encima
+                (lineas_ruta if en_ruta else lineas_red).append(linea)
                 etiquetas.append(((x1 + x2) / 2, (y1 + y2) / 2,
-                                  formatea_peso(peso)))
+                                  formatea_peso(peso), en_ruta))
+    partes += lineas_red + lineas_ruta
 
     # Los pesos van sobre las líneas, en una etiqueta en el punto medio
-    for x, y, texto in etiquetas:
+    for x, y, texto, en_ruta in etiquetas:
         ancho = 10 * len(texto) + 14
+        borde = COLOR_RUTA if en_ruta else "#C5CDD5"
+        color_texto = COLOR_RUTA if en_ruta else "#1F2933"
         partes.append(f'<rect x="{x - ancho / 2:.1f}" y="{y - 11:.1f}" '
                       f'width="{ancho}" height="22" rx="11" '
-                      f'fill="#FFFFFF" stroke="#C5CDD5"/>')
+                      f'fill="#FFFFFF" stroke="{borde}" stroke-width="2"/>')
         partes.append(f'<text x="{x:.1f}" y="{y + 5:.1f}" '
                       f'text-anchor="middle" font-size="13" '
-                      f'fill="#1F2933">{escape(texto)}</text>')
+                      f'font-weight="bold" fill="{color_texto}">'
+                      f'{escape(texto)}</text>')
 
     for nombre, (x, y) in posiciones.items():
+        relleno, borde, color_texto = "#FFFFFF", "#5B6770", "#1F2933"
+        if camino and nombre == camino[0]:
+            relleno = borde = COLOR_INICIO
+            color_texto = "#FFFFFF"
+        elif camino and nombre == camino[-1]:
+            relleno = borde = COLOR_DESTINO
+            color_texto = "#FFFFFF"
+        elif nombre in camino:
+            borde = COLOR_RUTA
         partes.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="22" '
-                      f'fill="#FFFFFF" stroke="#5B6770" stroke-width="3"/>')
+                      f'fill="{relleno}" stroke="{borde}" '
+                      f'stroke-width="3"/>')
         partes.append(f'<text x="{x:.1f}" y="{y + 6:.1f}" '
                       f'text-anchor="middle" font-size="18" '
-                      f'font-weight="bold" fill="#1F2933">'
+                      f'font-weight="bold" fill="{color_texto}">'
                       f'{escape(nombre)}</text>')
 
     partes.append("</svg>")
