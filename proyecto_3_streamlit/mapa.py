@@ -4,6 +4,10 @@
 # Descripción: Calcula posiciones y genera el svg del mapa de la red
 
 import math
+from html import escape
+
+from grafo import Grafo
+from io_handler import formatea_peso
 
 ANCHO_MAPA = 660
 ALTO_MAPA = 520
@@ -38,3 +42,56 @@ def calcula_posiciones(
         posiciones[nombre] = (centro_x + radio_x * math.cos(angulo),
                               centro_y + radio_y * math.sin(angulo))
     return posiciones
+
+
+def crea_svg_mapa(grafo: Grafo) -> str:
+    """Genera el SVG del mapa con nodos, conexiones y pesos.
+
+    Args:
+        grafo: Grafo cargado en memoria
+
+    Returns:
+        Texto con el SVG completo, listo para mostrarse en una página.
+    """
+    posiciones = calcula_posiciones(list(grafo.nodos))
+    partes = [f'<svg xmlns="http://www.w3.org/2000/svg" '
+              f'viewBox="0 0 {ANCHO_MAPA} {ALTO_MAPA}" '
+              f'width="100%" font-family="sans-serif">',
+              f'<rect width="{ANCHO_MAPA}" height="{ALTO_MAPA}" '
+              f'rx="12" fill="#EEF2F5"/>']
+
+    # Primero las líneas, para que los nodos queden encima
+    etiquetas = []
+    for origen in sorted(grafo.nodos):
+        for destino, peso in sorted(grafo.nodos[origen].vecinos.items()):
+            # Cada conexión se guarda en ambos sentidos: se dibuja una vez
+            if origen < destino:
+                x1, y1 = posiciones[origen]
+                x2, y2 = posiciones[destino]
+                partes.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" '
+                              f'x2="{x2:.1f}" y2="{y2:.1f}" '
+                              f'stroke="#9AA5B1" stroke-width="5" '
+                              f'stroke-linecap="round"/>')
+                etiquetas.append(((x1 + x2) / 2, (y1 + y2) / 2,
+                                  formatea_peso(peso)))
+
+    # Los pesos van sobre las líneas, en una etiqueta en el punto medio
+    for x, y, texto in etiquetas:
+        ancho = 10 * len(texto) + 14
+        partes.append(f'<rect x="{x - ancho / 2:.1f}" y="{y - 11:.1f}" '
+                      f'width="{ancho}" height="22" rx="11" '
+                      f'fill="#FFFFFF" stroke="#C5CDD5"/>')
+        partes.append(f'<text x="{x:.1f}" y="{y + 5:.1f}" '
+                      f'text-anchor="middle" font-size="13" '
+                      f'fill="#1F2933">{escape(texto)}</text>')
+
+    for nombre, (x, y) in posiciones.items():
+        partes.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="22" '
+                      f'fill="#FFFFFF" stroke="#5B6770" stroke-width="3"/>')
+        partes.append(f'<text x="{x:.1f}" y="{y + 6:.1f}" '
+                      f'text-anchor="middle" font-size="18" '
+                      f'font-weight="bold" fill="#1F2933">'
+                      f'{escape(nombre)}</text>')
+
+    partes.append("</svg>")
+    return "\n".join(partes)
