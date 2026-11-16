@@ -37,6 +37,9 @@ def carga_estado() -> None:
         aviso = MENSAJE_SIN_CSV
 
     try:
+        if RUTA_CSV.exists():
+            # carga_grafo oculta este error; se detecta aquí para avisar
+            RUTA_CSV.read_bytes().decode("utf-8")
         grafo, omitidas = cargar_grafo(RUTA_CSV)
     except FileNotFoundError:
         aviso = MENSAJE_SIN_CSV
